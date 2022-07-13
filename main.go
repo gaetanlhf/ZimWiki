@@ -7,14 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/JojiiOfficial/ZimWiki/zim"
-	"github.com/pelletier/go-toml"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -23,11 +22,14 @@ var (
 
 	//go:embed locale.zip
 	LocaleByte []byte
+
+	config []configStruct
 )
 
 type configStruct struct {
 	libPath             string
 	address             string
+	port                string
 	EnableSearchCache   bool
 	SearchCacheDuration int
 }
@@ -39,36 +41,38 @@ func main() {
 
 	handlers.LocaleByte = LocaleByte
 
-	// Default configuration of ZimWiki
-	defaultConfig, _ := toml.Load(`
-	[Config]
-	LibraryPath = "./library"
-	Address = ":8080"
-	EnableSearchCache = "true"
-	SearchCacheDuration = "2"`)
+	// Configuration file path is the actual folder
+	viper.AddConfigPath(".")
+	// Configuration file type is yaml
+	viper.SetConfigType("yaml")
+	// Configuration file name is config
+	viper.SetConfigName("config")
+	// Read configuration file
+	err := viper.ReadInConfig()
 
-	// Load default configuration
-	libPath := defaultConfig.Get("Config.LibraryPath").(string)
-	address := defaultConfig.Get("Config.Address").(string)
-	EnableSearchCache, _ := strconv.ParseBool(defaultConfig.Get("Config.EnableSearchCache").(string))
-	SearchCacheDuration, _ := strconv.Atoi(defaultConfig.Get("Config.SearchCacheDuration").(string))
-
-	// Load configuration file
-	configData, err := toml.LoadFile("config.toml")
-
-	// If the configuration file has been successfully loaded
-	if err == nil {
-		// Load the configuration from the configuration file
-		configDataTree := configData.Get("Config").(*toml.Tree)
-		libPath = configDataTree.Get("LibraryPath").(string)
-		address = configDataTree.Get("Address").(string)
-		EnableSearchCache, _ = strconv.ParseBool(configDataTree.Get("EnableSearchCache").(string))
-		SearchCacheDuration, _ = strconv.Atoi((configDataTree.Get("SearchCacheDuration")).(string))
-	} else {
-		log.Error("Config.toml not found, default configuration will be used.")
+	if err != nil {
+		_, ok := err.(viper.ConfigFileNotFoundError)
+		if ok {
+			// Config file not found
+			log.Fatal("Config file not found")
+		} else {
+			// Config file was found but another error was produced
+			log.Fatal("Error when reading the config file")
+		}
+		// Failed to read configuration file
+		log.Fatal(err)
 	}
 
-	config := configStruct{libPath: libPath, address: address, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration}
+	log.Info("Config loaded successfully")
+
+	// Load the configuration from the configuration file
+	libPath := viper.GetString("librarypath")
+	address := viper.GetString("address")
+	port := viper.GetString("port")
+	EnableSearchCache := viper.GetBool("enableasearchcache")
+	SearchCacheDuration := viper.GetInt("searchcacheduration")
+
+	config := configStruct{libPath: libPath, address: address, port: port, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration}
 
 	handlers.EnableSearchCache = EnableSearchCache
 	handlers.SearchCacheDuration = SearchCacheDuration
@@ -117,7 +121,7 @@ func startServer(zimService *zim.Handler, config configStruct) {
 // Build a new Http server
 func createServer(router http.Handler, config configStruct) http.Server {
 	return http.Server{
-		Addr:    config.address,
+		Addr:    config.address + ":" + config.port,
 		Handler: router,
 	}
 }
