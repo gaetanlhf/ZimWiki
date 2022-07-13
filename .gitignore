@@ -8,3 +8,5 @@ main
 library
 config.yaml
 ZimWiki
+*.ix
+*.ix.db
