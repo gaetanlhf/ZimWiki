@@ -77,10 +77,6 @@ func main() {
 	handlers.EnableSearchCache = EnableSearchCache
 	handlers.SearchCacheDuration = SearchCacheDuration
 
-	if len(os.Args) > 1 {
-		config.libPath = os.Args[1]
-	}
-
 	// Verify library path
 	s, err := os.Stat(config.libPath)
 	if err != nil {
