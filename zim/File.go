@@ -2,13 +2,14 @@ package zim
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/schollz/progressbar/v3"
+	log "github.com/sirupsen/logrus"
 	"github.com/tim-st/go-zim"
 )
 
@@ -131,20 +132,21 @@ func (zf *File) generateFileIndex(w io.Writer) (uint32, error) {
 	}()
 
 	// Print progress
+	log.Infof("Indexing %s...", zf.Filename())
+	bar := progressbar.NewOptions(100, progressbar.OptionClearOnFinish(), progressbar.OptionSetRenderBlankState(true))
+
 f:
 	for {
 		select {
 		case err := <-done:
+			bar.Finish()
 			if err != nil && err != stoppedErr {
 				return 0, err
 			}
-
-			fmt.Printf("\rIndexing %s ...done\n", zf.Filename())
+			log.Infof("Indexing of %s done", zf.Filename())
 			break f
-		case <-time.After(time.Second * 2):
-			if progress > 0 {
-				fmt.Printf("\rIndexing %s: %d%s", zf.Filename(), progress*100/zf.ArticleCount(), "%")
-			}
+		case <-time.After(time.Second):
+			bar.Set(int(progress * 100 / zf.ArticleCount()))
 		}
 	}
 
