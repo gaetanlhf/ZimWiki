@@ -8,13 +8,18 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/JojiiOfficial/ZimWiki/zim"
+	"github.com/briandowns/spinner"
+	"github.com/fsnotify/fsnotify"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/teamwork/reload"
 )
 
 var (
@@ -29,12 +34,14 @@ var (
 )
 
 type configStruct struct {
-	libPath             []string
-	address             string
-	port                string
-	indexPath           string
-	EnableSearchCache   bool
-	SearchCacheDuration int
+	libPath                []string
+	address                string
+	port                   string
+	indexPath              string
+	EnableSearchCache      bool
+	SearchCacheDuration    int
+	enableAutoRestart      bool
+	waitingTimeWhenRestart int
 }
 
 func main() {
@@ -66,8 +73,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Info("Config loaded successfully")
-
 	// Load the configuration from the configuration file
 	libPath := viper.GetStringSlice("librarypath")
 	address := viper.GetString("address")
@@ -75,8 +80,32 @@ func main() {
 	indexPath := viper.GetString("indexpath")
 	EnableSearchCache := viper.GetBool("enableasearchcache")
 	SearchCacheDuration := viper.GetInt("searchcacheduration")
+	enableAutoRestart := viper.GetBool("enableautorestart")
+	waitingTimeWhenRestart := viper.GetInt("waitingtimebeforerestart")
 
-	config := configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration}
+	config := configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration, enableAutoRestart: enableAutoRestart, waitingTimeWhenRestart: waitingTimeWhenRestart}
+
+	log.Info("Config loaded successfully")
+
+	if enableAutoRestart {
+		// Viper should check the configuration file for changes
+		viper.WatchConfig()
+		// When the configuration file is updated
+		viper.OnConfigChange(func(e fsnotify.Event) {
+			logrus.Warn("The configuration file has been updated: ", e.Name)
+			logrus.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
+			// Show a spinner
+			s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+			s.Start()
+			s.Color("white")
+			// Wait some time, the file can be updated successively
+			time.Sleep(time.Duration(config.waitingTimeWhenRestart) * time.Second)
+			// Stop the spinner
+			s.Stop()
+			// Restart the program
+			reload.Exec()
+		})
+	}
 
 	handlers.EnableSearchCache = EnableSearchCache
 	handlers.SearchCacheDuration = SearchCacheDuration
