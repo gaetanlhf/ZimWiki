@@ -16,7 +16,6 @@ import (
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/briandowns/spinner"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/teamwork/reload"
@@ -29,7 +28,7 @@ var (
 	//go:embed locale.zip
 	LocaleByte []byte
 
-	config []configStruct
+	config configStruct
 	files  []string
 )
 
@@ -83,7 +82,7 @@ func main() {
 	enableAutoRestart := viper.GetBool("enableautorestart")
 	waitingTimeWhenRestart := viper.GetInt("waitingtimebeforerestart")
 
-	config := configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration, enableAutoRestart: enableAutoRestart, waitingTimeWhenRestart: waitingTimeWhenRestart}
+	config = configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration, enableAutoRestart: enableAutoRestart, waitingTimeWhenRestart: waitingTimeWhenRestart}
 
 	log.Info("Config loaded successfully")
 
@@ -92,8 +91,8 @@ func main() {
 		viper.WatchConfig()
 		// When the configuration file is updated
 		viper.OnConfigChange(func(e fsnotify.Event) {
-			logrus.Warn("The configuration file has been updated: ", e.Name)
-			logrus.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
+			log.Warn("The configuration file has been updated: ", e.Name)
+			log.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
 			// Show a spinner
 			s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 			s.Start()
