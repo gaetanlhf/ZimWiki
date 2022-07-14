@@ -1,7 +1,6 @@
 package zim
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,8 +13,8 @@ import (
 
 // Handler manage zim files
 type Handler struct {
-	Dir   string
-	files []File
+	rawFiles []string
+	files    []File
 
 	// Cache for faster file search
 	fileCache map[string]*File
@@ -24,27 +23,35 @@ type Handler struct {
 }
 
 // New create a new zimservice
-func New(dir string) *Handler {
+func New(files []string) *Handler {
 	return &Handler{
-		Dir:       dir,
+		rawFiles:  files,
 		fileCache: make(map[string]*File),
 	}
 }
 
 // Start starts the zimservice
-func (zs *Handler) Start(libPath string) error {
+func (zs *Handler) Start(indexPath string) error {
 
 	// Load all zimfiles in given directorys
 	if err := zs.loadFiles(); err != nil {
 		return err
 	}
 
-	log.Infof("Successfully loaded %d zim file(s)", len(zs.files))
+	log.Infof("%d zim file(s) found", len(zs.files))
+
+	_, folderErr := os.Stat(indexPath)
+	if errors.Is(folderErr, os.ErrNotExist) {
+		folderErr := os.Mkdir(indexPath, os.ModePerm)
+		if folderErr != nil {
+			log.Error(folderErr)
+		}
+	}
 
 	// TODO add bleve indexing
 
 	// Set to true for bleve indexing
-	err := zs.GenerateIndex(libPath, false)
+	err := zs.GenerateIndex(indexPath, false)
 	if err == nil {
 		log.Info("Indexing successful")
 	}
@@ -61,27 +68,52 @@ func (zs *Handler) GetFiles() []File {
 func (zs *Handler) loadFiles() error {
 	var success, errs int
 
-	filepath.Walk(zs.Dir, func(path string, info os.FileInfo, err error) error {
-		// Ignore non regular files
-		if !info.IsDir() && !strings.HasSuffix(path, ".ix") && !strings.HasSuffix(path, ".ix.db") {
-			// We want to use the real
-			// path ond disk
-			realPath := path
+	for _, file := range zs.rawFiles {
+		fileInfo, err := os.Stat(file)
+		if err != nil {
+			return err
+		}
+		if fileInfo.IsDir() {
+			filepath.Walk(file, func(path string, info os.FileInfo, err error) error {
+				// Ignore non regular files
+				if !info.IsDir() && !strings.HasSuffix(path, ".ix") && !strings.HasSuffix(path, ".ix.db") {
+					// We want to use the real
+					// path ond disk
+					realPath := path
 
-			// Follow sysmlinks
-			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-				// Follow link
-				path, err = os.Readlink(path)
-				if err != nil {
-					return err
+					// Follow sysmlinks
+					if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+						// Follow link
+						path, err = os.Readlink(path)
+						if err != nil {
+							return err
+						}
+					}
+
+					// Try to open any file
+					f, err := zim.Open(path)
+					if err != nil {
+						errs++
+						log.Error(errors.Wrap(err, path))
+
+						// Ignore errors for now
+						return nil
+					}
+
+					zs.files = append(zs.files, File{
+						File: f,
+						Path: realPath,
+					})
+					success++
 				}
-			}
 
-			// Try to open any file
-			f, err := zim.Open(path)
+				return nil
+			})
+		} else {
+			f, err := zim.Open(file)
 			if err != nil {
 				errs++
-				log.Error(errors.Wrap(err, path))
+				log.Error(errors.Wrap(err, file))
 
 				// Ignore errors for now
 				return nil
@@ -89,13 +121,11 @@ func (zs *Handler) loadFiles() error {
 
 			zs.files = append(zs.files, File{
 				File: f,
-				Path: realPath,
+				Path: file,
 			})
 			success++
 		}
-
-		return nil
-	})
+	}
 
 	if success == 0 && errs > 0 {
 		log.Fatal("Too many errors")
@@ -135,13 +165,10 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 	// Create index for all files
 	for i := range zs.files {
 		file := &zs.files[i]
-
-		fmt.Printf("\rIndexing %s", file.Filename())
-
 		// Set index file
-		fdir, fname := filepath.Split(file.Path)
+		_, fname := filepath.Split(file.Path)
 		fname = "." + fname + ".ix"
-		file.IndexFile = filepath.Join(fdir, fname)
+		file.IndexFile = filepath.Join(libPath, fname)
 
 		// Check file validation
 		ok, err := indexDB.CheckFile(file.IndexFile)
@@ -150,7 +177,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 		}
 		// Skip file if index is still valid
 		if ok {
-			fmt.Printf("\rIndexing %s ...exists\n", file.Filename())
+			log.Infof("Index for %s exists", file.Filename())
 			continue
 		}
 
@@ -170,7 +197,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 
 			f.Close()
 		} else {
-			fmt.Println("\rSkipping Index", file.Filename())
+			log.Warn("Skipping Index", file.Filename())
 		}
 
 		// Add index to DB
@@ -186,7 +213,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 	}
 
 	if s > 0 {
-		fmt.Printf("Generated index size: %dMB\n", s/1000/1000)
+		log.Infof("Generated index size: %dMB\n", s/1000/1000)
 	}
 
 	return nil

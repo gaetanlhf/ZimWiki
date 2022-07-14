@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -24,12 +25,14 @@ var (
 	LocaleByte []byte
 
 	config []configStruct
+	files  []string
 )
 
 type configStruct struct {
-	libPath             string
+	libPath             []string
 	address             string
 	port                string
+	indexPath           string
 	EnableSearchCache   bool
 	SearchCacheDuration int
 }
@@ -66,30 +69,30 @@ func main() {
 	log.Info("Config loaded successfully")
 
 	// Load the configuration from the configuration file
-	libPath := viper.GetString("librarypath")
+	libPath := viper.GetStringSlice("librarypath")
 	address := viper.GetString("address")
 	port := viper.GetString("port")
+	indexPath := viper.GetString("indexpath")
 	EnableSearchCache := viper.GetBool("enableasearchcache")
 	SearchCacheDuration := viper.GetInt("searchcacheduration")
 
-	config := configStruct{libPath: libPath, address: address, port: port, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration}
+	config := configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration}
 
 	handlers.EnableSearchCache = EnableSearchCache
 	handlers.SearchCacheDuration = SearchCacheDuration
 
 	// Verify library path
-	s, err := os.Stat(config.libPath)
-	if err != nil {
-		log.Errorf("Can't use '%s' as library path. %s", config.libPath, err)
-		return
+	for _, ele := range config.libPath {
+		_, err := os.Stat(ele)
+		if err != nil {
+			log.Errorf("'%s' is invalid: %s", ele, err)
+			return
+		}
+		path, _ := filepath.Abs(ele)
+		files = append(files, path)
 	}
-	if !s.IsDir() {
-		log.Error("Library must be a path!")
-		return
-	}
-
-	service := zim.New(config.libPath)
-	err = service.Start(config.libPath)
+	service := zim.New(files)
+	err = service.Start(config.indexPath)
 	if err != nil {
 		log.Fatalln(err)
 		return
