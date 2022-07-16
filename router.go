@@ -12,7 +12,6 @@ import (
 	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 )
 
 // Route defining a route
@@ -152,14 +151,14 @@ func RouteHandler(inner RouteFunction, name string, hd handlers.HandlerData) htt
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := r.Body.Close(); err != nil {
-				log.Error(err)
+				Log.Error(err)
 			}
 		}()
 
 		// Only debug routes which have a names
 		needDebug := len(name) > 0
 		if needDebug {
-			log.Infof("[%s] %s\n", r.Method, name)
+			Log.Infof("[%s] %s\n", r.Method, name)
 		}
 
 		start := time.Now()
@@ -176,7 +175,7 @@ func RouteHandler(inner RouteFunction, name string, hd handlers.HandlerData) htt
 		// Process request and handle its error
 		if err := inner(rp, r, hd); err != nil {
 			if _, ok := err.(*net.OpError); ok {
-				log.Warn(err)
+				Log.Warn(err)
 				return
 			}
 
@@ -184,7 +183,7 @@ func RouteHandler(inner RouteFunction, name string, hd handlers.HandlerData) htt
 				sendServerError(rp)
 			}
 
-			log.Error(err)
+			Log.Error(err)
 			return
 		}
 

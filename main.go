@@ -115,6 +115,7 @@ func main() {
 
 	handlers.EnableSearchCache = EnableSearchCache
 	handlers.SearchCacheDuration = SearchCacheDuration
+	zim.Log = Log
 
 	// Verify library path
 	for _, ele := range config.libPath {

@@ -7,8 +7,12 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/tim-st/go-zim"
+)
+
+var (
+	Log *logrus.Logger
 )
 
 // Handler manage zim files
@@ -38,13 +42,13 @@ func (zs *Handler) Start(indexPath string) error {
 		return err
 	}
 
-	log.Infof("%d zim file(s) found", len(zs.files))
+	Log.Infof("%d zim file(s) found", len(zs.files))
 
 	_, folderErr := os.Stat(indexPath)
 	if errors.Is(folderErr, os.ErrNotExist) {
 		folderErr := os.Mkdir(indexPath, os.ModePerm)
 		if folderErr != nil {
-			log.Error(folderErr)
+			Log.Error(folderErr)
 		}
 	}
 
@@ -53,7 +57,7 @@ func (zs *Handler) Start(indexPath string) error {
 	// Set to true for bleve indexing
 	err := zs.GenerateIndex(indexPath, false)
 	if err == nil {
-		log.Info("Indexing successful")
+		Log.Info("Indexing successful")
 	}
 
 	return err
@@ -94,7 +98,7 @@ func (zs *Handler) loadFiles() error {
 					f, err := zim.Open(path)
 					if err != nil {
 						errs++
-						log.Error(errors.Wrap(err, path))
+						Log.Error(errors.Wrap(err, path))
 
 						// Ignore errors for now
 						return nil
@@ -113,7 +117,7 @@ func (zs *Handler) loadFiles() error {
 			f, err := zim.Open(file)
 			if err != nil {
 				errs++
-				log.Error(errors.Wrap(err, file))
+				Log.Error(errors.Wrap(err, file))
 
 				// Ignore errors for now
 				return nil
@@ -128,7 +132,7 @@ func (zs *Handler) loadFiles() error {
 	}
 
 	if success == 0 && errs > 0 {
-		log.Fatal("Too many errors")
+		Log.Fatal("Too many errors")
 	}
 
 	return nil
@@ -177,7 +181,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 		}
 		// Skip file if index is still valid
 		if ok {
-			log.Infof("Index for %s exists", file.Filename())
+			Log.Infof("Index for %s exists", file.Filename())
 			continue
 		}
 
@@ -197,7 +201,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 
 			f.Close()
 		} else {
-			log.Warn("Skipping Index", file.Filename())
+			Log.Warn("Skipping Index", file.Filename())
 		}
 
 		// Add index to DB
@@ -213,7 +217,7 @@ func (zs *Handler) GenerateIndex(libPath string, skipIndexing bool) error {
 	}
 
 	if s > 0 {
-		log.Infof("Generated index size: %dMB\n", s/1000/1000)
+		Log.Infof("Generated index size: %dMB\n", s/1000/1000)
 	}
 
 	return nil

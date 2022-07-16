@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/schollz/progressbar/v3"
-	log "github.com/sirupsen/logrus"
 	"github.com/tim-st/go-zim"
 )
 
@@ -132,7 +131,7 @@ func (zf *File) generateFileIndex(w io.Writer) (uint32, error) {
 	}()
 
 	// Print progress
-	log.Infof("Indexing %s...", zf.Filename())
+	Log.Infof("Indexing %s...", zf.Filename())
 	bar := progressbar.NewOptions(100, progressbar.OptionClearOnFinish(), progressbar.OptionSetRenderBlankState(true))
 
 f:
@@ -143,7 +142,7 @@ f:
 			if err != nil && err != stoppedErr {
 				return 0, err
 			}
-			log.Infof("Indexing of %s done", zf.Filename())
+			Log.Infof("Indexing of %s done", zf.Filename())
 			break f
 		case <-time.After(time.Second):
 			bar.Set(int(progress * 100 / zf.ArticleCount()))

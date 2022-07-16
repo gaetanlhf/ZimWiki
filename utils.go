@@ -3,8 +3,6 @@ package main
 import (
 	"net/http"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func sendResponse(w http.ResponseWriter, message string, params ...int) {
@@ -29,9 +27,9 @@ func LogError(err error, context ...map[string]interface{}) bool {
 	}
 
 	if len(context) > 0 {
-		log.WithFields(context[0]).Error(err.Error())
+		Log.WithFields(context[0]).Error(err.Error())
 	} else {
-		log.Error(err.Error())
+		Log.Error(err.Error())
 	}
 	return true
 }
@@ -41,8 +39,8 @@ func printProcessingDuration(startTime time.Time) {
 	dur := time.Since(startTime)
 
 	if dur < 1500*time.Millisecond {
-		log.Debugf("Duration: %s\n", dur.String())
+		Log.Debugf("Duration: %s\n", dur.String())
 	} else if dur > 1500*time.Millisecond {
-		log.Warningf("Duration: %s\n", dur.String())
+		Log.Warningf("Duration: %s\n", dur.String())
 	}
 }

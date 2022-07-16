@@ -3,7 +3,6 @@ package zim
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/tim-st/go-zim"
 )
 
@@ -29,7 +28,7 @@ func GetMainpageName(zimFile *File) *zim.DirectoryEntry {
 	defer zimFile.Mx.Unlock()
 	mp, err := zimFile.MainPage()
 	if err != nil {
-		log.Error(err)
+		Log.Error(err)
 		return nil
 	}
 
