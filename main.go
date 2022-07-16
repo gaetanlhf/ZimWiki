@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +15,7 @@ import (
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/briandowns/spinner"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/teamwork/reload"
@@ -30,6 +30,10 @@ var (
 
 	config configStruct
 	files  []string
+
+	srv  *http.Server
+	ctx  context.Context
+	stop context.CancelFunc
 )
 
 type configStruct struct {
@@ -126,62 +130,111 @@ func main() {
 		return
 	}
 
-	startServer(service, config)
+	startServer()
 }
 
-func startServer(zimService *zim.Handler, config configStruct) {
-	router := NewRouter(zimService)
-	server := createServer(router, config)
+func startServer() {
+	log.Info("Starting web server...")
+	// Create context that listens for the interrupt signal from the OS.
+	ctx, stop = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	// Set release mode
+	gin.SetMode(gin.ReleaseMode)
+	// Create a gin engine
+	webServer := gin.New()
+	webServer.GET("/", func(c *gin.Context) {
+		time.Sleep(20 * time.Second)
+		c.String(http.StatusOK, "Welcome Gin Server")
+	})
 
-	// Start server
+	srv = &http.Server{
+		Addr:    config.address + ":" + config.port,
+		Handler: webServer,
+	}
+	// Initializing the server in a goroutine so that it will not block the graceful shutdown handling
 	go func() {
-		err := server.ListenAndServe()
-		if err != http.ErrServerClosed {
-			log.Fatal(err)
+		err := srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
-	log.Info("Server started")
-	awaitExit(&server)
-}
+	log.Infof("HTTP server started on %s:%s", config.address, config.port)
 
-// Build a new Http server
-func createServer(router http.Handler, config configStruct) http.Server {
-	return http.Server{
-		Addr:    config.address + ":" + config.port,
-		Handler: router,
-	}
-}
+	// Listen for the interrupt signal.
+	<-ctx.Done()
 
-// Shutdown server gracefully
-func awaitExit(httpServer *http.Server) {
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, os.Interrupt, syscall.SIGKILL, syscall.SIGTERM)
+	// Restore default behavior on the interrupt signal and notify user of shutdown.
+	stop()
+	log.Info("Shutting down gracefully, press Ctrl+C again to force")
+	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+	s.Start()
 
-	// await os signal
-	<-signalChan
-
-	// Create a deadline for the await
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	// The context is used to inform the server it has 5 seconds to finish the request it is currently handling
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.waitingTimeWhenRestart)*time.Second)
 	defer cancel()
-
-	// Remove that ugly '^C'
-	fmt.Print("\r")
-
-	log.Info("Shutting down server")
-
-	if httpServer != nil {
-		err := httpServer.Shutdown(ctx)
-		if err != nil {
-			log.Warn(err)
-		}
-
-		log.Info("HTTP server shutdown complete")
+	err := srv.Shutdown(ctx)
+	if err != nil {
+		s.Stop()
+		log.Fatal("ZimWiki forced to shutdown: ", err)
 	}
-
-	log.Info("Shutting down complete")
-	os.Exit(0)
+	s.Stop()
+	log.Println("Server exiting")
 }
+
+// func startServer(zimService *zim.Handler, config configStruct) {
+// 	router := NewRouter(zimService)
+// 	server := createServer(router, config)
+
+// 	// Start server
+// 	go func() {
+// 		err := server.ListenAndServe()
+// 		if err != http.ErrServerClosed {
+// 			log.Fatal(err)
+// 		}
+// 	}()
+
+// 	log.Info("Server started")
+// 	awaitExit(&server)
+// }
+
+// // Build a new Http server
+// func createServer(router http.Handler, config configStruct) http.Server {
+// 	return http.Server{
+// 		Addr:    config.address + ":" + config.port,
+// 		Handler: router,
+// 	}
+// }
+
+// // Shutdown server gracefully
+// func awaitExit(httpServer *http.Server) {
+// 	signalChan := make(chan os.Signal, 1)
+// 	signal.Notify(signalChan, syscall.SIGINT, os.Interrupt, syscall.SIGKILL, syscall.SIGTERM)
+
+// 	// await os signal
+// 	<-signalChan
+
+// 	// Create a deadline for the await
+// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+// 	defer cancel()
+
+// 	// Remove that ugly '^C'
+// 	fmt.Print("\r")
+
+// 	log.Info("Shutting down server")
+
+// 	if httpServer != nil {
+// 		err := httpServer.Shutdown(ctx)
+// 		if err != nil {
+// 			log.Warn(err)
+// 		}
+
+// 		log.Info("HTTP server shutdown complete")
+// 	}
+
+// 	log.Info("Shutting down complete")
+// 	os.Exit(0)
+// }
 
 func setupLogger() {
 	log.SetOutput(os.Stdout)
