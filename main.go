@@ -37,6 +37,8 @@ var (
 	srv  *http.Server
 	ctx  context.Context
 	stop context.CancelFunc
+
+	s = spinner.New(spinner.CharSets[26], 100*time.Millisecond)
 )
 
 type configStruct struct {
@@ -99,16 +101,36 @@ func main() {
 		// When the configuration file is updated
 		viper.OnConfigChange(func(e fsnotify.Event) {
 			Log.Warn("The configuration file has been updated: ", e.Name)
-			Log.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
+			if srv == nil {
+				Log.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
+			} else {
+				Log.Warn("ZimWiki will restart within a maximum of " + strconv.Itoa(config.waitingTimeWhenRestart) + " seconds if the current http requests do not end")
+			}
 			// Show a spinner
-			s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 			s.Start()
-			s.Color("white")
+
 			// Wait some time, the file can be updated successively
-			time.Sleep(time.Duration(config.waitingTimeWhenRestart) * time.Second)
+			if srv != nil {
+				// Create a deadline for the await
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+
+				if srv != nil {
+					err := srv.Shutdown(ctx)
+					if err != nil {
+						s.Stop()
+						Log.Warn("The HTTP server has been killed after " + strconv.Itoa(config.waitingTimeWhenRestart) + " seconds of waiting")
+					} else {
+						Log.Info("The HTTP server has been successfully stopped")
+					}
+				}
+			} else {
+				time.Sleep(time.Duration(config.waitingTimeWhenRestart) * time.Second)
+			}
 			// Stop the spinner
 			s.Stop()
 			// Restart the program
+			Log.Info("Restart in progress...")
 			reload.Exec()
 		})
 	}
