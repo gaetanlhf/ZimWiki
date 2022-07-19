@@ -1,21 +1,13 @@
 package main
 
 import (
-	"context"
 	"embed"
-	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
-	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/JojiiOfficial/ZimWiki/utils"
 	"github.com/JojiiOfficial/ZimWiki/zim"
-	"github.com/briandowns/spinner"
-	"github.com/gin-gonic/gin"
-	ginlogrus "github.com/toorop/gin-logrus"
 )
 
 var (
@@ -26,10 +18,6 @@ var (
 	LocaleByte []byte
 
 	files []string
-
-	srv  *http.Server
-	ctx  context.Context
-	stop context.CancelFunc
 )
 
 func main() {
@@ -38,8 +26,6 @@ func main() {
 	handlers.WebFS = WebFS
 
 	handlers.LocaleByte = LocaleByte
-
-	utils.Srv = srv
 
 	utils.LoadConfig()
 
@@ -60,53 +46,7 @@ func main() {
 		return
 	}
 
-	startServer()
-}
-func startServer() {
-	utils.Log.Info("Starting web server...")
-	// Create context that listens for the interrupt signal from the OS.
-	ctx, stop = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	// Set release mode
-	gin.SetMode(gin.ReleaseMode)
-	// Create a gin engine
-	webServer := gin.New()
-	// Logrus logger handler for gin
-	webServer.Use(ginlogrus.Logger(utils.Log), gin.Recovery())
-	webServer.GET("/", func(c *gin.Context) {
-		time.Sleep(20 * time.Second)
-		c.String(http.StatusOK, "Welcome Gin Server")
-	})
-	srv = &http.Server{
-		Addr:    utils.Config.Address + ":" + utils.Config.Port,
-		Handler: webServer,
-	}
-	// Initializing the server in a goroutine so that it will not block the graceful shutdown handling
-	go func() {
-		err := srv.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			utils.Log.Fatalf("listen: %s\n", err)
-		}
-	}()
-
-	utils.Log.Infof("HTTP server started on %s:%s", utils.Config.Address, utils.Config.Port)
-	// Listen for the interrupt signal.
-	<-ctx.Done()
-	// Restore default behavior on the interrupt signal and notify user of shutdown.
-	stop()
-	utils.Log.Info("Shutting down gracefully, press Ctrl+C again to force")
-	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
-	s.Start()
-	// The context is used to inform the server it has 5 seconds to finish the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(utils.Config.WaitingTimeWhenRestart)*time.Second)
-	defer cancel()
-	err := srv.Shutdown(ctx)
-	if err != nil {
-		s.Stop()
-		utils.Log.Fatal("ZimWiki forced to shutdown: ", err)
-	}
-	s.Stop()
-	utils.Log.Println("Server exiting")
+	utils.StartServer()
 }
 
 // func startServer(zimService *zim.Handler, utils.Config configStruct) {

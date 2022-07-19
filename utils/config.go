@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 
 var (
 	Config configStruct
-	Srv    *http.Server
 
 	s = spinner.New(spinner.CharSets[26], 100*time.Millisecond)
 )
@@ -73,7 +71,7 @@ func LoadConfig() {
 		// When the configuration file is updated
 		viper.OnConfigChange(func(e fsnotify.Event) {
 			Log.Warn("The configuration file has been updated: ", e.Name)
-			if Srv == nil {
+			if srv == nil {
 				Log.Warn("ZimWiki will be restarted in " + strconv.Itoa(Config.WaitingTimeWhenRestart) + " second(s)...")
 			} else {
 				Log.Warn("ZimWiki will restart within a maximum of " + strconv.Itoa(Config.WaitingTimeWhenRestart) + " seconds if the current http requests do not end")
@@ -82,13 +80,13 @@ func LoadConfig() {
 			s.Start()
 
 			// Wait some time, the file can be updated successively
-			if Srv != nil {
+			if srv != nil {
 				// Create a deadline for the await
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 
-				if Srv != nil {
-					err := Srv.Shutdown(ctx)
+				if srv != nil {
+					err := srv.Shutdown(ctx)
 					if err != nil {
 						s.Stop()
 						Log.Warn("The HTTP server has been killed after " + strconv.Itoa(Config.WaitingTimeWhenRestart) + " seconds of waiting")
