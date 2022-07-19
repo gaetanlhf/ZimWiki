@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JojiiOfficial/ZimWiki/utils"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tim-st/go-zim"
 )
@@ -131,7 +132,7 @@ func (zf *File) generateFileIndex(w io.Writer) (uint32, error) {
 	}()
 
 	// Print progress
-	Log.Infof("Indexing %s...", zf.Filename())
+	utils.Log.Infof("Indexing %s...", zf.Filename())
 	bar := progressbar.NewOptions(100, progressbar.OptionClearOnFinish(), progressbar.OptionSetRenderBlankState(true))
 
 f:
@@ -142,7 +143,7 @@ f:
 			if err != nil && err != stoppedErr {
 				return 0, err
 			}
-			Log.Infof("Indexing of %s done", zf.Filename())
+			utils.Log.Infof("Indexing of %s done", zf.Filename())
 			break f
 		case <-time.After(time.Second):
 			bar.Set(int(progress * 100 / zf.ArticleCount()))

@@ -3,6 +3,7 @@ package zim
 import (
 	"fmt"
 
+	"github.com/JojiiOfficial/ZimWiki/utils"
 	"github.com/tim-st/go-zim"
 )
 
@@ -28,7 +29,7 @@ func GetMainpageName(zimFile *File) *zim.DirectoryEntry {
 	defer zimFile.Mx.Unlock()
 	mp, err := zimFile.MainPage()
 	if err != nil {
-		Log.Error(err)
+		utils.Log.Error(err)
 		return nil
 	}
 
