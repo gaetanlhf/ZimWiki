@@ -43,9 +43,6 @@ func main() {
 
 	utils.LoadConfig()
 
-	handlers.EnableSearchCache = utils.Config.EnableSearchCache
-	handlers.SearchCacheDuration = utils.Config.SearchCacheDuration
-
 	// Verify library path
 	for _, ele := range utils.Config.LibPath {
 		_, err := os.Stat(ele)
