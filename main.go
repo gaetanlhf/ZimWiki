@@ -7,18 +7,15 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/handlers"
+	"github.com/JojiiOfficial/ZimWiki/utils"
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/briandowns/spinner"
-	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"github.com/teamwork/reload"
 	ginlogrus "github.com/toorop/gin-logrus"
 )
 
@@ -29,28 +26,14 @@ var (
 	//go:embed locale.zip
 	LocaleByte []byte
 
-	config configStruct
-	files  []string
+	files []string
 
 	Log = logrus.New()
 
 	srv  *http.Server
 	ctx  context.Context
 	stop context.CancelFunc
-
-	s = spinner.New(spinner.CharSets[26], 100*time.Millisecond)
 )
-
-type configStruct struct {
-	libPath                []string
-	address                string
-	port                   string
-	indexPath              string
-	EnableSearchCache      bool
-	SearchCacheDuration    int
-	enableAutoRestart      bool
-	waitingTimeWhenRestart int
-}
 
 func main() {
 	setupLogger()
@@ -59,88 +42,16 @@ func main() {
 
 	handlers.LocaleByte = LocaleByte
 
-	// Configuration file path is the actual folder
-	viper.AddConfigPath(".")
-	// Configuration file type is yaml
-	viper.SetConfigType("yaml")
-	// Configuration file name is config
-	viper.SetConfigName("config")
-	// Read configuration file
-	err := viper.ReadInConfig()
+	utils.Srv = srv
 
-	if err != nil {
-		_, ok := err.(viper.ConfigFileNotFoundError)
-		if ok {
-			// Config file not found
-			Log.Fatal("Config file not found")
-		} else {
-			// Config file was found but another error was produced
-			Log.Fatal("Error when reading the config file")
-		}
-		// Failed to read configuration file
-		Log.Fatal(err)
-	}
+	utils.LoadConfig()
 
-	// Load the configuration from the configuration file
-	libPath := viper.GetStringSlice("librarypath")
-	address := viper.GetString("address")
-	port := viper.GetString("port")
-	indexPath := viper.GetString("indexpath")
-	EnableSearchCache := viper.GetBool("enableasearchcache")
-	SearchCacheDuration := viper.GetInt("searchcacheduration")
-	enableAutoRestart := viper.GetBool("enableautorestart")
-	waitingTimeWhenRestart := viper.GetInt("waitingtimebeforerestart")
-
-	config = configStruct{libPath: libPath, address: address, port: port, indexPath: indexPath, EnableSearchCache: EnableSearchCache, SearchCacheDuration: SearchCacheDuration, enableAutoRestart: enableAutoRestart, waitingTimeWhenRestart: waitingTimeWhenRestart}
-
-	Log.Info("Config loaded successfully")
-
-	if enableAutoRestart {
-		// Viper should check the configuration file for changes
-		viper.WatchConfig()
-		// When the configuration file is updated
-		viper.OnConfigChange(func(e fsnotify.Event) {
-			Log.Warn("The configuration file has been updated: ", e.Name)
-			if srv == nil {
-				Log.Warn("ZimWiki will be restarted in " + strconv.Itoa(config.waitingTimeWhenRestart) + " second(s)...")
-			} else {
-				Log.Warn("ZimWiki will restart within a maximum of " + strconv.Itoa(config.waitingTimeWhenRestart) + " seconds if the current http requests do not end")
-			}
-			// Show a spinner
-			s.Start()
-
-			// Wait some time, the file can be updated successively
-			if srv != nil {
-				// Create a deadline for the await
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-
-				if srv != nil {
-					err := srv.Shutdown(ctx)
-					if err != nil {
-						s.Stop()
-						Log.Warn("The HTTP server has been killed after " + strconv.Itoa(config.waitingTimeWhenRestart) + " seconds of waiting")
-					} else {
-						Log.Info("The HTTP server has been successfully stopped")
-					}
-				}
-			} else {
-				time.Sleep(time.Duration(config.waitingTimeWhenRestart) * time.Second)
-			}
-			// Stop the spinner
-			s.Stop()
-			// Restart the program
-			Log.Info("Restart in progress...")
-			reload.Exec()
-		})
-	}
-
-	handlers.EnableSearchCache = EnableSearchCache
-	handlers.SearchCacheDuration = SearchCacheDuration
+	handlers.EnableSearchCache = utils.Config.EnableSearchCache
+	handlers.SearchCacheDuration = utils.Config.SearchCacheDuration
 	zim.Log = Log
 
 	// Verify library path
-	for _, ele := range config.libPath {
+	for _, ele := range utils.Config.LibPath {
 		_, err := os.Stat(ele)
 		if err != nil {
 			Log.Errorf("'%s' is invalid: %s", ele, err)
@@ -150,7 +61,7 @@ func main() {
 		files = append(files, path)
 	}
 	service := zim.New(files)
-	err = service.Start(config.indexPath)
+	err := service.Start(utils.Config.IndexPath)
 	if err != nil {
 		Log.Fatalln(err)
 		return
@@ -158,7 +69,6 @@ func main() {
 
 	startServer()
 }
-
 func startServer() {
 	Log.Info("Starting web server...")
 	// Create context that listens for the interrupt signal from the OS.
@@ -174,9 +84,8 @@ func startServer() {
 		time.Sleep(20 * time.Second)
 		c.String(http.StatusOK, "Welcome Gin Server")
 	})
-
 	srv = &http.Server{
-		Addr:    config.address + ":" + config.port,
+		Addr:    utils.Config.Address + ":" + utils.Config.Port,
 		Handler: webServer,
 	}
 	// Initializing the server in a goroutine so that it will not block the graceful shutdown handling
@@ -187,19 +96,16 @@ func startServer() {
 		}
 	}()
 
-	Log.Infof("HTTP server started on %s:%s", config.address, config.port)
-
+	Log.Infof("HTTP server started on %s:%s", utils.Config.Address, utils.Config.Port)
 	// Listen for the interrupt signal.
 	<-ctx.Done()
-
 	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	stop()
 	Log.Info("Shutting down gracefully, press Ctrl+C again to force")
 	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
 	s.Start()
-
 	// The context is used to inform the server it has 5 seconds to finish the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.waitingTimeWhenRestart)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(utils.Config.WaitingTimeWhenRestart)*time.Second)
 	defer cancel()
 	err := srv.Shutdown(ctx)
 	if err != nil {
@@ -210,9 +116,9 @@ func startServer() {
 	Log.Println("Server exiting")
 }
 
-// func startServer(zimService *zim.Handler, config configStruct) {
+// func startServer(zimService *zim.Handler, utils.Config configStruct) {
 // 	router := NewRouter(zimService)
-// 	server := createServer(router, config)
+// 	server := createServer(router, utils.Config)
 
 // 	// Start server
 // 	go func() {
@@ -227,9 +133,9 @@ func startServer() {
 // }
 
 // // Build a new Http server
-// func createServer(router http.Handler, config configStruct) http.Server {
+// func createServer(router http.Handler, utils.Config configStruct) http.Server {
 // 	return http.Server{
-// 		Addr:    config.address + ":" + config.port,
+// 		Addr:    utils.Config.Address + ":" + utils.Config.Port,
 // 		Handler: router,
 // 	}
 // }
