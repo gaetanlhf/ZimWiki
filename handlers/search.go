@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JojiiOfficial/ZimWiki/utils"
+	"github.com/JojiiOfficial/ZimWiki/config"
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/gorilla/mux"
 	"zgo.at/zcache"
@@ -19,7 +19,7 @@ import (
 
 var (
 	// Cache initialization with a default expiration time of X minutes and purge expired items every X minutes
-	searchCache = zcache.New(time.Duration(utils.Config.SearchCacheDuration)*time.Minute, time.Duration(utils.Config.SearchCacheDuration)*time.Minute)
+	searchCache = zcache.New(time.Duration(config.Config.SearchCacheDuration)*time.Minute, time.Duration(config.Config.SearchCacheDuration)*time.Minute)
 )
 
 func searchSingle(query string, nbResultsPerPage int, resultsUntil int, wiki *zim.File) ([]zim.SRes, int, int, bool) {
@@ -31,12 +31,12 @@ func searchSingle(query string, nbResultsPerPage int, resultsUntil int, wiki *zi
 	cachedData, found := searchCache.Get(query + wiki.Path)
 
 	// If not cached or with a disabled cache
-	if !found || !utils.Config.EnableSearchCache {
+	if !found || !config.Config.EnableSearchCache {
 		// Search entries
 		entries = wiki.SearchForEntry(query)
 		// Sort them by similarity
 		sort.Sort(sort.Reverse(zim.ByPercentage(entries)))
-		if utils.Config.EnableSearchCache {
+		if config.Config.EnableSearchCache {
 			// Cache the search with the default expiration time
 			searchCache.Set(query+wiki.Path, entries, zcache.DefaultExpiration)
 		}
@@ -87,7 +87,7 @@ func searchGlobal(query string, nbResultsPerPage int, resultsUntil int, handler 
 	cachedData, found := searchCache.Get(query)
 
 	// If not cached or with a disabled cache
-	if !found || !utils.Config.EnableSearchCache {
+	if !found || !config.Config.EnableSearchCache {
 		mx := sync.Mutex{}
 		wg := sync.WaitGroup{}
 		files := handler.GetFiles()
@@ -113,7 +113,7 @@ func searchGlobal(query string, nbResultsPerPage int, resultsUntil int, handler 
 
 		// Sort by similarity
 		sort.Sort(sort.Reverse(zim.ByPercentage(results)))
-		if utils.Config.EnableSearchCache {
+		if config.Config.EnableSearchCache {
 			// Cache the search with the default expiration time
 			searchCache.Set(query, results, zcache.DefaultExpiration)
 		}

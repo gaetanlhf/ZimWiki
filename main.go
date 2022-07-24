@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/JojiiOfficial/ZimWiki/config"
 	"github.com/JojiiOfficial/ZimWiki/handlers"
-	"github.com/JojiiOfficial/ZimWiki/utils"
+	"github.com/JojiiOfficial/ZimWiki/log"
+	"github.com/JojiiOfficial/ZimWiki/server"
 	"github.com/JojiiOfficial/ZimWiki/zim"
 )
 
@@ -21,30 +23,30 @@ var (
 )
 
 func main() {
-	utils.SetupLogger()
+	log.SetupLogger()
 
 	handlers.WebFS = WebFS
 
 	handlers.LocaleByte = LocaleByte
 
-	utils.LoadConfig()
+	config.LoadConfig()
 
 	// Verify library path
-	for _, ele := range utils.Config.LibPath {
+	for _, ele := range config.Config.LibPath {
 		_, err := os.Stat(ele)
 		if err != nil {
-			utils.Log.Errorf("'%s' is invalid: %s", ele, err)
+			log.Errorf("'%s' is invalid: %s", ele, err)
 			return
 		}
 		path, _ := filepath.Abs(ele)
 		files = append(files, path)
 	}
 	service := zim.New(files)
-	err := service.Start(utils.Config.IndexPath)
+	err := service.Start(config.Config.IndexPath)
 	if err != nil {
-		utils.Log.Fatalln(err)
+		log.Fatalln(err)
 		return
 	}
 
-	utils.StartServer()
+	server.StartServer(service)
 }
