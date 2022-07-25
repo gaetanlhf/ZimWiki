@@ -44,5 +44,7 @@ func GetRoutes() {
 	})
 
 	WebServer.GET("/", handlers.ShowIndexPage)
+	WebServer.GET("/wiki/raw/*raw", handlers.WikiRaw)
+	WebServer.GET("/wiki/view/*view", handlers.WikiView)
 
 }

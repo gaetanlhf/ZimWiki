@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/JojiiOfficial/ZimWiki/zim"
+	"github.com/gin-gonic/gin"
 	gzim "github.com/tim-st/go-zim"
 )
 
-func parseWikiRequest(w http.ResponseWriter, r *http.Request, hd HandlerData, isRedirect bool) (*zim.File, *gzim.Namespace, *gzim.DirectoryEntry, bool) {
-	sPath := strings.Split(parseURLPath(r.URL), "/")
+func parseWikiRequest(ctx *gin.Context, hd HandlerData, isRedirect bool) (*zim.File, *gzim.Namespace, *gzim.DirectoryEntry, bool) {
+	sPath := strings.Split(parseURLPath(ctx.Request.URL), "/")
 
 	var reqWikiID string
 	var z *zim.File
@@ -45,14 +46,14 @@ func parseWikiRequest(w http.ResponseWriter, r *http.Request, hd HandlerData, is
 		}
 
 		// Something is missing in the given URL
-		http.Redirect(w, r, newLoc, http.StatusMovedPermanently)
+		ctx.Redirect(http.StatusMovedPermanently, newLoc)
 		return nil, nil, nil, false
 	}
 
 	// Throw error for invalid namespaces
 	reqNamespace := sPath[3]
 	if !strings.ContainsAny(reqNamespace, "ABIJMUVWX-") || len(reqNamespace) > 1 {
-		http.NotFound(w, r)
+		ctx.AbortWithStatus(http.StatusNotFound)
 		return nil, nil, nil, false
 	}
 
@@ -62,7 +63,7 @@ func parseWikiRequest(w http.ResponseWriter, r *http.Request, hd HandlerData, is
 	switch namespace {
 	case gzim.NamespaceLayout, gzim.NamespaceArticles, gzim.NamespaceImagesFiles, gzim.NamespaceImagesText:
 	default:
-		http.NotFound(w, r)
+		ctx.AbortWithStatus(http.StatusNotFound)
 		return nil, nil, nil, false
 	}
 
@@ -83,18 +84,18 @@ func parseWikiRequest(w http.ResponseWriter, r *http.Request, hd HandlerData, is
 			// Try to add/remove plural suffix
 			if strings.HasSuffix(reqFileURL, "s") {
 				useAltURL = true
-				r.URL.Path = r.URL.Path[:len(r.URL.Path)-1]
+				ctx.Request.URL.Path = ctx.Request.URL.Path[:len(ctx.Request.URL.Path)-1]
 			} else {
 				useAltURL = true
-				r.URL.Path = r.URL.Path + "s"
+				ctx.Request.URL.Path = ctx.Request.URL.Path + "s"
 			}
 
 			if useAltURL {
-				return parseWikiRequest(w, r, hd, true)
+				return parseWikiRequest(ctx, hd, true)
 			}
 		}
 
-		http.NotFound(w, r)
+		ctx.AbortWithStatus(http.StatusNotFound)
 		return nil, nil, nil, false
 	}
 
@@ -113,21 +114,27 @@ func parseWikiRequest(w http.ResponseWriter, r *http.Request, hd HandlerData, is
 			destURL = zim.GetRawWikiURL(z, entry)
 		}
 
-		http.Redirect(w, r, destURL, http.StatusMovedPermanently)
+		ctx.Redirect(http.StatusMovedPermanently, destURL)
 		return nil, nil, nil, false
 	}
 
-	return z, &namespace, &entry, true
+	return z,
+		&namespace,
+		&entry,
+		true
 }
 
 // WikiRaw handle direct wiki requests, without embedding into the webUI
-func WikiRaw(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
+func WikiRaw(ctx *gin.Context) {
+	hd := ctx.MustGet("hd").(HandlerData)
 	// Find file and dirEntry
-	z, _, entry, success := parseWikiRequest(w, r, hd, false)
+	z, _, entry, success := parseWikiRequest(ctx, hd, false)
 	if !success {
 		// We already handled
 		// http errors & redirects
-		return nil
+		ctx.AbortWithStatus(http.StatusNotFound)
+		return
+
 	}
 
 	// Create reader from requested file
@@ -135,31 +142,38 @@ func WikiRaw(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 	defer z.Mx.Unlock()
 	blobReader, _, err := z.BlobReader(entry)
 	if err != nil {
-		return err
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
 	}
 
 	// Set Mimetype accordingly
 	if mimetypeList := z.MimetypeList(); int(entry.Mimetype()) < len(mimetypeList) {
-		w.Header().Set("Content-Type", mimetypeList[entry.Mimetype()])
+		ctx.Header("Content-Type", mimetypeList[entry.Mimetype()])
 	}
 
-	// Cache files
-	w.Header().Set("Cache-Control", "max-age=31536000, public")
+	// // Cache files
+	// w.Header().Set("Cache-Control", "max-age=31536000, public")
 
 	// Send raw file
 	buff := make([]byte, 1024*1024)
-	_, err = io.CopyBuffer(w, blobReader, buff)
-	return err
+	_, err = io.CopyBuffer(ctx.Writer, blobReader, buff)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+
+		return
+	}
 }
 
 // WikiView sends a human friendly preview page for a WIKI site
-func WikiView(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
+func WikiView(ctx *gin.Context) {
+	hd := ctx.MustGet("hd").(HandlerData)
 	// Find file and dirEntry
-	z, namespace, entry, success := parseWikiRequest(w, r, hd, false)
+	z, namespace, entry, success := parseWikiRequest(ctx, hd, false)
 	if !success {
 		// We already handled
 		// http errors & redirects
-		return nil
+		ctx.AbortWithStatus(http.StatusNotFound)
+		return
 	}
 
 	var favurl, favType string
@@ -173,18 +187,14 @@ func WikiView(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 		favurl = zim.GetRawWikiURL(z, favIcon)
 	}
 
-	// Cache files
-	w.Header().Set("Cache-Control", "max-age=31536000, public")
-
-	return serveTemplate(WikiPageTemplate, w, r, TemplateData{
-		FavIcon:      favurl,
-		Favtype:      favType,
-		Wiki:         z.GetID(),
-		Namespace:    string(*namespace),
-		WikiViewTemplateData: WikiViewTemplateData{
-			Source: zim.GetRawWikiURL(z, *entry),
-		},
+	ctx.HTML(http.StatusOK, "viewPage", gin.H{
+		"FavIcon":   favurl,
+		"Favtype":   favType,
+		"Wiki":      z.GetID(),
+		"Namespace": string(*namespace),
+		"Source":    zim.GetRawWikiURL(z, *entry),
 	})
+
 }
 
 func parseURLPath(u *url.URL) string {
