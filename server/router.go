@@ -2,6 +2,7 @@ package server
 
 import (
 	"embed"
+	"net/http"
 	"path/filepath"
 
 	"github.com/JojiiOfficial/ZimWiki/handlers"
@@ -12,6 +13,7 @@ import (
 
 var (
 	TemplateFS embed.FS
+	StaticFS   embed.FS
 )
 
 func embeddedFileHandler(config goview.Config, tmpl string) (string, error) {
@@ -34,6 +36,8 @@ func GetRoutes() {
 	gv.ViewEngine.SetFileHandler(embeddedFileHandler)
 
 	WebServer.HTMLRender = gv
+
+	WebServer.StaticFS("/public", http.FS(StaticFS))
 
 	WebServer.Use(func(c *gin.Context) {
 		c.Set("hd", hd)

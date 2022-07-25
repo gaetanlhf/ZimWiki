@@ -16,6 +16,9 @@ var (
 	//go:embed templates/*
 	TemplateFS embed.FS
 
+	//go:embed static/*
+	StaticFS embed.FS
+
 	//go:embed locale.zip
 	LocaleByte []byte
 
@@ -26,6 +29,7 @@ func main() {
 	log.SetupLogger()
 
 	server.TemplateFS = TemplateFS
+	server.StaticFS = StaticFS
 
 	handlers.LocaleByte = LocaleByte
 
