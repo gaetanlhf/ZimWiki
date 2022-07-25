@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	//go:embed html/*
-	WebFS embed.FS
+	//go:embed templates/*
+	TemplateFS embed.FS
 
 	//go:embed locale.zip
 	LocaleByte []byte
@@ -25,7 +25,7 @@ var (
 func main() {
 	log.SetupLogger()
 
-	handlers.WebFS = WebFS
+	server.TemplateFS = TemplateFS
 
 	handlers.LocaleByte = LocaleByte
 

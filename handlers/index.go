@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/JojiiOfficial/ZimWiki/zim"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -12,7 +13,8 @@ var (
 )
 
 // Index handle index route
-func Index(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
+func ShowIndexPage(ctx *gin.Context) {
+	hd := ctx.MustGet("hd").(HandlerData)
 	var cards []HomeCards
 
 	// Create cards
@@ -37,14 +39,6 @@ func Index(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 		})
 	}
 
-	// Cache files
-	w.Header().Set("Cache-Control", "max-age=31536000, public")
+	ctx.HTML(http.StatusOK, "home", gin.H{"Cards": cards, "Version": version, "Buildtime": buildTime})
 
-	return serveTemplate(HomeTemplate, w, r, TemplateData{
-		HomeTemplateData: HomeTemplateData{
-			Cards:     cards,
-			Version:   version,
-			BuildTime: buildTime,
-		},
-	})
 }
