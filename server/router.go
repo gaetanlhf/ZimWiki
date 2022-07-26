@@ -4,10 +4,15 @@ import (
 	"embed"
 	"net/http"
 	"path/filepath"
+	"time"
 
+	"github.com/JojiiOfficial/ZimWiki/config"
 	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/foolin/goview"
 	"github.com/foolin/goview/supports/ginview"
+	"github.com/gin-contrib/cache"
+	"github.com/gin-contrib/cache/persistence"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,16 +40,22 @@ func GetRoutes() {
 
 	gv.ViewEngine.SetFileHandler(embeddedFileHandler)
 
-	WebServer.HTMLRender = gv
+	memorystore := persistence.NewInMemoryStore(time.Duration(config.Config.SearchCacheDuration) * time.Minute)
 
-	WebServer.StaticFS("/public", http.FS(StaticFS))
+	WebServer.HTMLRender = gv
 
 	WebServer.Use(func(c *gin.Context) {
 		c.Set("hd", hd)
 	})
 
-	WebServer.GET("/", handlers.ShowIndexPage)
-	WebServer.GET("/wiki/raw/*raw", handlers.WikiRaw)
-	WebServer.GET("/wiki/view/*view", handlers.WikiView)
+	WebServer.Use(func(c *gin.Context) {
+		c.Writer.Header().Add("Cache-Control", "max-age=31536000")
+	})
+
+	WebServer.Use(gzip.Gzip(gzip.DefaultCompression))
+	WebServer.StaticFS("/public", http.FS(StaticFS))
+	WebServer.GET("/", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.ShowIndexPage))
+	WebServer.GET("/wiki/raw/*raw", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.WikiRaw))
+	WebServer.GET("/wiki/view/*view", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.WikiView))
 
 }

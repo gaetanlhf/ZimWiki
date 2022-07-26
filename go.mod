@@ -2,7 +2,7 @@ module github.com/JojiiOfficial/ZimWiki
 
 go 1.16
 
-replace github.com/tim-st/go-zim v0.1.4 => github.com/JojiiOfficial/go-zim v0.1.4
+replace github.com/tim-st/go-zim v0.1.4 => github.com/gaetanlhf/gozimlib v0.1.4-2
 
 require (
 	github.com/agext/levenshtein v1.2.3
@@ -10,6 +10,7 @@ require (
 	github.com/chai2010/gettext-go v1.0.2
 	github.com/foolin/goview v0.3.0
 	github.com/fsnotify/fsnotify v1.5.4
+	github.com/gin-contrib/cache v1.2.0
 	github.com/gin-contrib/gzip v0.0.6
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-playground/validator/v10 v10.11.0 // indirect
