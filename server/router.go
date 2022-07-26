@@ -57,5 +57,6 @@ func GetRoutes() {
 	WebServer.GET("/", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.ShowIndexPage))
 	WebServer.GET("/wiki/raw/*raw", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.WikiRaw))
 	WebServer.GET("/wiki/view/*view", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.WikiView))
+	WebServer.GET("/wiki/search", cache.CachePage(memorystore, time.Duration(config.Config.SearchCacheDuration)*time.Minute, handlers.Search))
 
 }

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"math"
 	"net/http"
 	"sort"
@@ -10,11 +9,10 @@ import (
 	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/config"
+	"github.com/JojiiOfficial/ZimWiki/log"
 	"github.com/JojiiOfficial/ZimWiki/zim"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"zgo.at/zcache"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -153,25 +151,17 @@ func searchGlobal(query string, nbResultsPerPage int, resultsUntil int, handler 
 }
 
 // Search handles search requests
-func Search(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
-	vars := mux.Vars(r)
-	wiki, ok := vars["wiki"]
-	if !ok {
-		return fmt.Errorf("Missing parameter")
+func Search(ctx *gin.Context) {
+	hd := ctx.MustGet("hd").(HandlerData)
+	content := ctx.Query("content")
+	query := ctx.Query("query")
+	actualPageNb, err := strconv.Atoi(ctx.Query("page"))
+	if err != nil {
+		actualPageNb = 1
 	}
-	var query string
-	var actualPageNb int
-
-	if r.Method == "POST" {
-		// Get Post search query
-		query = r.PostFormValue("sQuery")
-		// Get the number of the current page
-		actualPageNb, _ = strconv.Atoi(r.PostFormValue("pageNumber"))
-	}
-
-	if len(query) == 0 {
-		http.Redirect(w, r, "/", http.StatusMovedPermanently)
-		return nil
+	if query == "" {
+		ctx.Redirect(http.StatusMovedPermanently, "/")
+		return
 	}
 
 	// If the variable is not defined or negative, we set it to 1
@@ -192,16 +182,16 @@ func Search(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 	var isCached bool
 
 	start := time.Now()
-	if wiki == "-" {
+	if content == "" {
 		source = "global search"
 
 		res, nbResults, nbPages, isCached = searchGlobal(query, nbResultsPerPage, resultsUntil, hd.ZimService)
 	} else {
 		// Wiki search
-		z := hd.ZimService.FindWikiFile(wiki)
+		z := hd.ZimService.FindWikiFile(content)
 		if z == nil {
-			http.NotFound(w, r)
-			return ErrNotFound
+			ctx.AbortWithStatus(http.StatusNotFound)
+			return
 		}
 		source = z.File.Title()
 
@@ -241,7 +231,7 @@ func Search(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 			Img:   fav,
 			Link:  zim.GetWikiURL(res[i].File, *res[i].DirectoryEntry),
 			Title: string(res[i].Title()),
-			Wiki:  wiki,
+			Wiki:  content,
 		}
 	}
 
@@ -250,7 +240,7 @@ func Search(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 	var resultText string
 	var cachedText string
 
-	if isCached == true {
+	if isCached {
 		cachedText = " from cache"
 	}
 
@@ -261,28 +251,25 @@ func Search(w http.ResponseWriter, r *http.Request, hd HandlerData) error {
 	} else {
 		resultText = strconv.Itoa(nbResults) + " results"
 	}
-
 	log.Info(resultText, cachedText, " in ", timeTook)
 
 	// Redirect to wiki page if only
 	// one search result was found
 	if len(results) == 1 {
-		http.Redirect(w, r, results[0].Link, http.StatusMovedPermanently)
-		return nil
+		ctx.Redirect(http.StatusNotFound, results[0].Link)
+		return
 	}
 
-	return serveTemplate(SearchTemplate, w, r, TemplateData{
-		Wiki: wiki,
-		SearchTemplateData: SearchTemplateData{
-			Results:      results,
-			QueryText:    query,
-			SearchSource: source,
-			NbResults:    nbResults,
-			TimeTook:     timeTook,
-			ActualPageNb: actualPageNb,
-			NbPages:      nbPages,
-			PreviousPage: previousPage,
-			NextPage:     nextPage,
-		},
+	ctx.HTML(http.StatusOK, "search", gin.H{
+		"Wiki":         content,
+		"Results":      results,
+		"QueryText":    query,
+		"SearchSource": source,
+		"NbResults":    nbResults,
+		"TimeTook":     timeTook,
+		"ActualPageNb": actualPageNb,
+		"NbPages":      nbPages,
+		"PreviousPage": previousPage,
+		"NextPage":     nextPage,
 	})
 }

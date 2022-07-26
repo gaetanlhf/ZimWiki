@@ -16,11 +16,11 @@
 
     {{ if .Wiki }}
     <script>
-        var searchPlaceholder = 'Search globally'
+        var searchPlaceholder = 'Search in this wiki'
     </script>
     {{else}}
         <script>
-            var searchPlaceholder = 'Search in this wiki'
+            var searchPlaceholder = 'Search globally'
         </script>
         {{end}}
 </head>
@@ -49,9 +49,10 @@
                     </a>
                 </div>
                 <div class="col-8 d-flex justify-content-end align-items-center">
-                    <form method="POST" action="/search/{{ .Wiki }}/" id="searchform">
+                    <form method="GET" action="/wiki/search" id="searchform">
                         <div class="input-group">
-                            <input type="text" class="form-control" id="sQuery" name="sQuery" placeholder="Search" minlength="2" required>
+                            <input type="hidden" class="form-control" id="content" name="content" value="{{ .Wiki }}" required>
+                            <input type="text" class="form-control" id="query" name="query" placeholder="Search" minlength="2" required>
                             <button class="btn btn-outline-secondary" type="submit"><i class="fa fa-search fa-fw" aria-hidden="true"></i></button>
                         </div>
                     </form>
