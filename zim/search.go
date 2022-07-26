@@ -4,8 +4,8 @@ import (
 	"hash/fnv"
 	"strings"
 
+	"github.com/JojiiOfficial/ZimWiki/log"
 	"github.com/agext/levenshtein"
-	"github.com/sirupsen/logrus"
 	"github.com/tim-st/go-zim"
 )
 
@@ -83,7 +83,7 @@ func (zf *File) indexSearch(query string) ([]SRes, bool) {
 			if err == nil {
 				entry = fl
 			} else {
-				logrus.Warn(err)
+				log.Warn(err)
 			}
 
 			// Also add redirected to map
@@ -129,7 +129,7 @@ func (zf *File) fullSearch(query string) []SRes {
 				if err == nil {
 					entry = &fl
 				} else {
-					logrus.Warn(err)
+					log.Warn(err)
 				}
 
 				// Also add redirected to map
