@@ -48,7 +48,7 @@ func LoadConfig() {
 	Address := viper.GetString("Address")
 	Port := viper.GetString("Port")
 	IndexPath := viper.GetString("indexpath")
-	EnableSearchCache := viper.GetBool("enableasearchcache")
+	EnableSearchCache := viper.GetBool("enablesearchcache")
 	SearchCacheDuration := viper.GetInt("searchcacheduration")
 	EnableAutoRestart := viper.GetBool("enableautorestart")
 	WaitingTimeWhenRestart := viper.GetInt("waitingtimebeforerestart")
