@@ -19,19 +19,14 @@ var (
 	//go:embed static/*
 	StaticFS embed.FS
 
-	//go:embed locale.zip
-	LocaleByte []byte
-
 	files []string
 )
 
 func main() {
 	log.SetupLogger()
 
-	server.TemplateFS = TemplateFS
-	server.StaticFS = StaticFS
-
-	handlers.LocaleByte = LocaleByte
+	handlers.TemplateFS = TemplateFS
+	handlers.StaticFS = StaticFS
 
 	config.LoadConfig()
 

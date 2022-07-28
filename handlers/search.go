@@ -20,6 +20,13 @@ var (
 	searchCache = zcache.New(time.Duration(config.Config.SearchCacheDuration)*time.Minute, time.Duration(config.Config.SearchCacheDuration)*time.Minute)
 )
 
+type SearchResult struct {
+	Img   string
+	Wiki  string
+	Title string
+	Link  string
+}
+
 func searchSingle(query string, nbResultsPerPage int, resultsUntil int, wiki *zim.File) ([]zim.SRes, int, int, bool) {
 	var entries []zim.SRes
 
@@ -152,7 +159,7 @@ func searchGlobal(query string, nbResultsPerPage int, resultsUntil int, handler 
 
 // Search handles search requests
 func Search(ctx *gin.Context) {
-	hd := ctx.MustGet("hd").(HandlerData)
+	ZimService := ctx.MustGet("ZimService").(*zim.Handler)
 	content := ctx.Query("content")
 	query := ctx.Query("query")
 	actualPageNb, err := strconv.Atoi(ctx.Query("page"))
@@ -185,10 +192,10 @@ func Search(ctx *gin.Context) {
 	if content == "" {
 		source = "global search"
 
-		res, nbResults, nbPages, isCached = searchGlobal(query, nbResultsPerPage, resultsUntil, hd.ZimService)
+		res, nbResults, nbPages, isCached = searchGlobal(query, nbResultsPerPage, resultsUntil, ZimService)
 	} else {
 		// Wiki search
-		z := hd.ZimService.FindWikiFile(content)
+		z := ZimService.FindWikiFile(content)
 		if z == nil {
 			ctx.AbortWithStatus(http.StatusNotFound)
 			return

@@ -11,7 +11,7 @@ import (
 	gzim "github.com/tim-st/go-zim"
 )
 
-func parseWikiRequest(ctx *gin.Context, hd HandlerData, isRedirect bool) (*zim.File, *gzim.Namespace, *gzim.DirectoryEntry, bool) {
+func parseWikiRequest(ctx *gin.Context, ZimService *zim.Handler, isRedirect bool) (*zim.File, *gzim.Namespace, *gzim.DirectoryEntry, bool) {
 	sPath := strings.Split(parseURLPath(ctx.Request.URL), "/")
 
 	var reqWikiID string
@@ -23,10 +23,10 @@ func parseWikiRequest(ctx *gin.Context, hd HandlerData, isRedirect bool) (*zim.F
 		// WikiID represents the zim UUID
 		reqWikiID = sPath[2]
 
-		hd.ZimService.Mx.Lock()
+		ZimService.Mx.Lock()
 		// Find requested wiki file by given ID
-		z = hd.ZimService.FindWikiFile(reqWikiID)
-		hd.ZimService.Mx.Unlock()
+		z = ZimService.FindWikiFile(reqWikiID)
+		ZimService.Mx.Unlock()
 		if z == nil {
 			return nil, nil, nil, false
 		}
@@ -91,7 +91,7 @@ func parseWikiRequest(ctx *gin.Context, hd HandlerData, isRedirect bool) (*zim.F
 			}
 
 			if useAltURL {
-				return parseWikiRequest(ctx, hd, true)
+				return parseWikiRequest(ctx, ZimService, true)
 			}
 		}
 
@@ -126,9 +126,9 @@ func parseWikiRequest(ctx *gin.Context, hd HandlerData, isRedirect bool) (*zim.F
 
 // WikiRaw handle direct wiki requests, without embedding into the webUI
 func WikiRaw(ctx *gin.Context) {
-	hd := ctx.MustGet("hd").(HandlerData)
+	ZimService := ctx.MustGet("ZimService").(*zim.Handler)
 	// Find file and dirEntry
-	z, _, entry, success := parseWikiRequest(ctx, hd, false)
+	z, _, entry, success := parseWikiRequest(ctx, ZimService, false)
 	if !success {
 		// We already handled
 		// http errors & redirects
@@ -166,9 +166,9 @@ func WikiRaw(ctx *gin.Context) {
 
 // WikiView sends a human friendly preview page for a WIKI site
 func WikiView(ctx *gin.Context) {
-	hd := ctx.MustGet("hd").(HandlerData)
+	ZimService := ctx.MustGet("ZimService").(*zim.Handler)
 	// Find file and dirEntry
-	z, namespace, entry, success := parseWikiRequest(ctx, hd, false)
+	z, namespace, entry, success := parseWikiRequest(ctx, ZimService, false)
 	if !success {
 		// We already handled
 		// http errors & redirects

@@ -7,7 +7,6 @@ replace github.com/tim-st/go-zim v0.1.4 => github.com/gaetanlhf/gozimlib v0.1.4-
 require (
 	github.com/agext/levenshtein v1.2.3
 	github.com/briandowns/spinner v1.18.1
-	github.com/chai2010/gettext-go v1.0.2
 	github.com/foolin/goview v0.3.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/gin-contrib/cache v1.2.0
@@ -15,8 +14,6 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-playground/validator/v10 v10.11.0 // indirect
 	github.com/goccy/go-json v0.9.10 // indirect
-	github.com/gorilla/mux v1.8.0
-	github.com/klauspost/compress v1.15.9
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/schollz/progressbar/v3 v3.8.7

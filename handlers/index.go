@@ -12,14 +12,21 @@ var (
 	buildTime string
 )
 
+type HomeCards struct {
+	Image string
+	Title string
+	Text  string
+	Link  string
+}
+
 // Index handle index route
-func ShowIndexPage(ctx *gin.Context) {
-	hd := ctx.MustGet("hd").(HandlerData)
+func Index(ctx *gin.Context) {
+	ZimService := ctx.MustGet("ZimService").(*zim.Handler)
 	var cards []HomeCards
 
 	// Create cards
-	for i := range hd.ZimService.GetFiles() {
-		file := &hd.ZimService.GetFiles()[i]
+	for i := range ZimService.GetFiles() {
+		file := &ZimService.GetFiles()[i]
 
 		info := file.GetInfos()
 

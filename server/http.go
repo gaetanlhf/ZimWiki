@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/JojiiOfficial/ZimWiki/config"
+	"github.com/JojiiOfficial/ZimWiki/handlers"
 	"github.com/JojiiOfficial/ZimWiki/log"
 	"github.com/JojiiOfficial/ZimWiki/zim"
 	"github.com/briandowns/spinner"
@@ -57,8 +58,12 @@ func StartServer(service *zim.Handler) {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
-
-	GetRoutes()
+	handlers.AddHTMLCache(WebServer)
+	handlers.AddGzip(WebServer)
+	handlers.AddStatic(WebServer)
+	handlers.AddService(WebServer, ZimService)
+	WebServer.HTMLRender = handlers.AddTemplate(WebServer)
+	handlers.AddRoutes(WebServer)
 
 	log.Infof("HTTP server started on %s:%s", config.Config.Address, config.Config.Port)
 
